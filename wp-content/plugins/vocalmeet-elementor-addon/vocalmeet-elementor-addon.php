@@ -53,8 +53,6 @@ final class Vocalmeet_Elementor_Addon {
 	}
 
 	public function register_widget_scripts() {
-		wp_register_script( 'vm-elementor-widget', plugins_url( 'assets/js/elementor-widget.js', __FILE__ ), [ 'jquery', 'elementor-frontend' ], '1.0.0', true );
-		
 		wp_localize_script( 'vm-elementor-widget', 'vmWidgetData', [
 			'root'  => esc_url_raw( rest_url() ),
 			'nonce' => wp_create_nonce( 'wp_rest' ),
@@ -103,8 +101,6 @@ final class Vocalmeet_Elementor_Addon {
 	}
 
 	private function includes() {
-		require_once( __DIR__ . '/includes/shortcode-create-product.php' );
-		
 		add_action( 'elementor/widgets/register', function( $widgets_manager ) {
 			require_once( __DIR__ . '/includes/widgets/class-vm-product-widget.php' );
 			$widgets_manager->register( new \Vocalmeet_Product_Widget() );
