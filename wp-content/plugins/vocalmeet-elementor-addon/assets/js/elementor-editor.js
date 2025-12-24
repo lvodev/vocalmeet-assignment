@@ -438,6 +438,8 @@
                     const widgetId = model.get('id');
                     if (widgetId) {
                         fillProductIdsInWidget(widgetId);
+                        // Clear the product ID from the localStorage
+                        localStorage.removeItem('vm_recent_products');
                     }
                 }
             });
