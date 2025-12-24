@@ -6,6 +6,11 @@
      * Using widget title instead of data-widget-type for Elementor 3.34.0 compatibility
      */
     window.addEventListener('elementor:init', function() {
+        const RECENT_PRODUCTS_KEY = 'vm_recent_products';
+        const PRODUCT_WIDGET_TYPE = 'vocalmeet_product_widget';
+        const PRODUCT_ID_SETTING = 'product_id';
+        const MAX_RECENT_PRODUCTS = 20;
+
         // Create modal HTML
         const modalHTML = `
             <div id="vm-product-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999999;display:none;align-items:center;justify-content:center;">
@@ -45,6 +50,18 @@
         // Rate limiting: track last submission time
         let lastSubmissionTime = 0;
         const MIN_SUBMISSION_INTERVAL = 2000; // 2 seconds between submissions
+
+        function getRecentProducts() {
+            return JSON.parse(localStorage.getItem(RECENT_PRODUCTS_KEY) || '[]');
+        }
+
+        function setRecentProducts(products) {
+            localStorage.setItem(RECENT_PRODUCTS_KEY, JSON.stringify(products));
+        }
+
+        function clearRecentProducts() {
+            localStorage.removeItem(RECENT_PRODUCTS_KEY);
+        }
 
         // Security: HTML escape function to prevent XSS
         function escapeHtml(text) {
@@ -257,7 +274,7 @@
 
         // Function to render recent products list
         function renderProductList(container) {
-            const recentProducts = JSON.parse(localStorage.getItem('vm_recent_products') || '[]');
+            const recentProducts = getRecentProducts();
             const listContainer = container.querySelector('.vm-recent-products-list');
             
             if (!listContainer) return;
@@ -303,7 +320,7 @@
                         const elementContainer = elementor.getContainer(widgetId);
                         if (elementContainer) {
                             // Update the product_id setting
-                            elementContainer.settings.setExternalChange('product_id', productId);
+                            elementContainer.settings.setExternalChange(PRODUCT_ID_SETTING, productId);
                             
                             // Show success feedback
                             this.style.background = '#d4edda';
@@ -316,7 +333,7 @@
                                 return view.model && view.model.get('id') === widgetId;
                             });
                             if (allContainers && allContainers.length > 0) {
-                                allContainers[0].settings.setExternalChange('product_id', productId);
+                                allContainers[0].settings.setExternalChange(PRODUCT_ID_SETTING, productId);
                                 this.style.background = '#d4edda';
                                 setTimeout(() => {
                                     this.style.background = '#fff';
@@ -426,7 +443,7 @@
                 closeModal();
                 
                 // Sanitize and store product in localStorage for later use
-                let recentProducts = JSON.parse(localStorage.getItem('vm_recent_products') || '[]');
+                let recentProducts = getRecentProducts();
                 recentProducts.unshift({
                     id: parseInt(data.id) || 0, // Ensure ID is a number
                     name: sanitizeInput(String(data.name || '')), // Sanitize name
@@ -434,8 +451,8 @@
                     created_at: new Date().toISOString()
                 });
                 // Keep only last 20 products
-                recentProducts = recentProducts.slice(0, 20);
-                localStorage.setItem('vm_recent_products', JSON.stringify(recentProducts));
+                recentProducts = recentProducts.slice(0, MAX_RECENT_PRODUCTS);
+                setRecentProducts(recentProducts);
                     
                     // Refresh product lists in all widgets
                     renderAllProductLists();
@@ -490,9 +507,9 @@
                                     targetContainer.commands.run('document/elements/create', {
                                         model: {
                                             elType: 'widget',
-                                            widgetType: 'vocalmeet_product_widget',
+                                            widgetType: PRODUCT_WIDGET_TYPE,
                                             settings: {
-                                                product_id: data.id.toString()
+                                                [PRODUCT_ID_SETTING]: data.id.toString()
                                             }
                                         },
                                         container: targetContainer
@@ -535,7 +552,7 @@
         
         // Function to log recent products
         function logRecentProducts(source) {
-            const recentProducts = JSON.parse(localStorage.getItem('vm_recent_products') || '[]');
+            const recentProducts = getRecentProducts();
             console.log('=== Vocalmeet Product Widget Detected ===');
             console.log('Detection Source:', source);
             console.log('Recent Products from Local Storage:', recentProducts);
@@ -548,17 +565,17 @@
         
         // Function to fill product IDs in widget
         function fillProductIdsInWidget(widgetId) {
-            const recentProducts = JSON.parse(localStorage.getItem('vm_recent_products') || '[]');
+            const recentProducts = getRecentProducts();
             if (recentProducts.length > 0 && widgetId) {
                 const productIds = recentProducts.map(product => product.id).join(',');
                 
                 setTimeout(function() {
                     const container = elementor.getContainer(widgetId);
                     if (container && container.settings) {
-                        const currentProductId = container.settings.get('product_id');
+                        const currentProductId = container.settings.get(PRODUCT_ID_SETTING);
                         if (!currentProductId || currentProductId === '') {
                             // Update the setting - this will update both control and trigger re-render
-                            container.settings.setExternalChange('product_id', productIds);
+                            container.settings.setExternalChange(PRODUCT_ID_SETTING, productIds);
                             
                             // Force a render update
                             if (container.render) {
@@ -583,7 +600,7 @@
             if (elementor.hooks && elementor.hooks.addAction) {
                 elementor.hooks.addAction('document/elements/create', function(model, container) {
                     // Check if it's our widget
-                    if (model && model.get && model.get('widgetType') === 'vocalmeet_product_widget') {
+                    if (model && model.get && model.get('widgetType') === PRODUCT_WIDGET_TYPE) {
                         const widgetId = model.get('id');
                         if (widgetId) {
                             // Fill product IDs immediately when widget is created
@@ -615,7 +632,7 @@
                         if (node.classList && node.classList.contains('elementor-widget')) {
                             const widgetType = node.getAttribute('data-widget-type') || 
                                              (node.querySelector('[data-widget-type]') && node.querySelector('[data-widget-type]').getAttribute('data-widget-type'));
-                            if (widgetType === 'vocalmeet_product_widget') {
+                            if (widgetType === PRODUCT_WIDGET_TYPE) {
                                 // Also check for product selector inside
                                 const selector = node.querySelector('.vm-product-selector');
                                 if (selector) {
@@ -670,7 +687,7 @@
                 if (!model) return;
         
                 if (model.get('elType') === 'widget' &&
-                    model.get('widgetType') === 'vocalmeet_product_widget') {
+                    model.get('widgetType') === PRODUCT_WIDGET_TYPE) {
                     
                     // Widget was successfully added - log recent products
                     logRecentProducts('Widget Added via Drag-and-Drop');
@@ -680,7 +697,7 @@
                     if (widgetId) {
                         fillProductIdsInWidget(widgetId);
                         // Clear the product ID from the localStorage
-                        localStorage.removeItem('vm_recent_products');
+                        clearRecentProducts();
                     }
                 }
             });
@@ -688,4 +705,3 @@
     });
 
 })();
-
