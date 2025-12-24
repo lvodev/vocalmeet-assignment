@@ -1,0 +1,21 @@
+/*
+!/.gitignore
+!/.github/
+
+!/wp-content/
+/wp-content/*
+!/wp-content/themes/
+/wp-content/themes/*
+!/wp-content/themes/hello-elementor-child/
+
+/wp-content/themes/hello-elementor-child/node_modules
+/wp-content/themes/hello-elementor-child/vendor
+/wp-content/themes/hello-elementor-child/*.zip
+
+!/wp-content/plugins/
+/wp-content/plugins/*
+# !/wp-content/plugins/woo-frontend-creator/
+# /wp-content/plugins/woo-frontend-creator/vendor
+
+!/wp-content/plugins/vocalmeet-elementor-addon/
+/wp-content/plugins/vocalmeet-elementor-addon/vendor

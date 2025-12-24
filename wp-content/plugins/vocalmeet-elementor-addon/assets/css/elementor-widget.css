@@ -1,0 +1,26 @@
+/* Elementor Widget Styles */
+.vm-widget-placeholder {
+    padding: 20px;
+    background: #f1f1f1;
+    border: 1px dashed #ccc;
+    text-align: center;
+}
+
+.vm-create-product-btn-editor {
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.vm-create-product-btn-editor:hover {
+    background: #005177;
+}
+
+.vm-product-display {
+    border: 1px solid #ddd;
+    padding: 15px;
+    text-align: center;
+}
