@@ -22,7 +22,7 @@ class Vocalmeet_Product_Widget extends \Elementor\Widget_Base {
 	}
 
 	public function get_script_depends() {
-		return [ 'vm-elementor-widget' ];
+		return [];
 	}
 
 	public function get_style_depends() {

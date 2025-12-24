@@ -7,7 +7,7 @@ Addon that ties Elementor to WooCommerce. Provides a custom Elementor widget for
 - Logged-in user with permissions to create WooCommerce products (REST calls use the current user's `X-WP-Nonce`).
 
 ## Project Structure
-- `vocalmeet-elementor-addon.php` — Plugin bootstrap. Checks dependencies, registers/enqueues assets, and wires shortcode + widget registration.
+- `vocalmeet-elementor-addon.php` — Plugin bootstrap. Checks dependencies, registers/enqueues assets, and wires widget registration.
 - `includes/widgets/class-vm-product-widget.php` — Elementor widget:
   - Editor placeholder that lists recently created products when no ID is set.
   - Renders products by ID (comma-separated allowed) on the front end.
@@ -16,7 +16,6 @@ Addon that ties Elementor to WooCommerce. Provides a custom Elementor widget for
   - Replaces click-to-add with a modal to create a product.
   - Persists recent products in `localStorage`, lets you pick them, and auto-fills the widget setting.
   - Adds the widget to the canvas with the created product ID when possible.
-- `assets/js/elementor-widget.js` — Frontend script for the widget; provides a simple modal-based product creator when interacting with the widget in Elementor preview.
 - `assets/css/elementor-widget.css` — Basic styling for the widget placeholder and display.
 
 ## How to Run

@@ -41,8 +41,7 @@ final class Vocalmeet_Elementor_Addon {
 			return;
 		}
 
-		// Register scripts
-		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_widget_scripts' ] );
+		// Register styles
 		add_action( 'elementor/frontend/after_register_styles', [ $this, 'register_widget_styles' ] );
 		
 		// Register editor scripts to prevent click-to-add
@@ -50,13 +49,6 @@ final class Vocalmeet_Elementor_Addon {
 
 		// Include requires
 		$this->includes();
-	}
-
-	public function register_widget_scripts() {
-		wp_localize_script( 'vm-elementor-widget', 'vmWidgetData', [
-			'root'  => esc_url_raw( rest_url() ),
-			'nonce' => wp_create_nonce( 'wp_rest' ),
-		] );
 	}
 
 	public function register_widget_styles() {
