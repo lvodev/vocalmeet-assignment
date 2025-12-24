@@ -46,6 +46,10 @@
             form.reset();
             messageDiv.style.display = 'none';
             messageDiv.innerHTML = '';
+            // Reset submit button state
+            const createBtn = document.getElementById('vm-modal-create');
+            createBtn.disabled = false;
+            createBtn.textContent = 'Create Product';
         }
 
         // Function to close modal
@@ -182,6 +186,9 @@
             .then(data => {
                 if (data.id) {
                     // Product created successfully
+                    // Reset submit button before closing modal
+                    createBtn.disabled = false;
+                    createBtn.textContent = 'Create Product';
                     closeModal();
                     
                     // Store product in localStorage for later use
