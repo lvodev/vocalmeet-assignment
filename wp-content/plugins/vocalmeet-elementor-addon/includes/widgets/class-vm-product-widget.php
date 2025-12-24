@@ -90,17 +90,141 @@ class Vocalmeet_Product_Widget extends \Elementor\Widget_Base {
 		if ( settings.product_id ) {
 			// Split product IDs by comma and loop through them (same as render method)
 			var productIds = settings.product_id.split(',');
+			var productIdsArray = [];
 			_.each( productIds, function( productId ) {
 				productId = productId.trim();
 				if ( productId ) {
-					#>
-					<div class="vm-product-display">
-						<h3>Product ID: {{ productId }}</h3>
-						<span class="price">(Save to view product details)</span>
-					</div>
-					<#
+					productIdsArray.push( productId );
 				}
 			});
+			
+			// Display loading state first
+			_.each( productIdsArray, function( productId ) {
+				#>
+				<div class="vm-product-display vm-product-loading" data-product-id="{{ productId }}">
+					<h3>Loading product {{ productId }}...</h3>
+					<span class="price">Please wait...</span>
+				</div>
+				<#
+			});
+			
+			// Fetch product data via AJAX using Elementor's context
+			if ( productIdsArray.length > 0 ) {
+				// Use setTimeout to ensure DOM is ready and vmEditorData is available
+				var fetchProducts = function() {
+					if ( typeof vmEditorData === 'undefined' ) {
+						// Fallback: try again after a short delay
+						setTimeout(fetchProducts, 200);
+						return;
+					}
+					
+					// Process each product ID
+					_.each( productIdsArray, function( productId ) {
+						findElementAndFetch(productId);
+					});
+					
+					// Separate function to find element and fetch product
+					function findElementAndFetch(productId) {
+						// Try to find element with retry logic
+						var findElement = function(retryCount) {
+							retryCount = retryCount || 0;
+							var maxRetries = 10;
+							
+							var productElement = null;
+							
+							// Method 1: Direct querySelector
+							productElement = document.querySelector( '.vm-product-loading[data-product-id="' + productId + '"]' );
+							
+							// Method 2: Try querySelectorAll and find by data attribute
+							if ( !productElement ) {
+								var allElements = document.querySelectorAll( '.vm-product-loading' );
+								for ( var i = 0; i < allElements.length; i++ ) {
+									var elemId = allElements[i].getAttribute('data-product-id');
+									if ( elemId === productId ) {
+										productElement = allElements[i];
+										break;
+									}
+								}
+							}
+							
+							// Method 3: Try in Elementor preview iframe
+							if ( !productElement && typeof elementor !== 'undefined' ) {
+								var previewFrame = document.querySelector('#elementor-preview-responsive-wrapper iframe');
+								if ( previewFrame && previewFrame.contentDocument ) {
+									productElement = previewFrame.contentDocument.querySelector( '.vm-product-loading[data-product-id="' + productId + '"]' );
+								}
+							}
+							
+							if ( productElement ) {
+								fetchAndUpdateProduct(productId, productElement);
+							} else if ( retryCount < maxRetries ) {
+								setTimeout(function() {
+									findElement(retryCount + 1);
+								}, 200);
+							}
+						};
+						
+						// Start finding
+						findElement(0);
+					}
+					
+					// Separate function to fetch and update product
+					function fetchAndUpdateProduct(productId, productElement) {
+						var apiUrl = vmEditorData.root + 'wc/v3/products/' + productId;
+						
+						// Fetch product via REST API
+						fetch( apiUrl, {
+							method: 'GET',
+							headers: {
+								'X-WP-Nonce': vmEditorData.nonce
+							}
+						})
+						.then(function(response) {
+							if ( !response.ok ) {
+								return response.json().then(function(err) {
+									throw new Error(err.message || 'Failed to fetch product');
+								});
+							}
+							return response.json();
+						})
+						.then(function(product) {
+							if ( product && product.name ) {
+								var priceHtml = '';
+								if ( product.regular_price ) {
+									priceHtml = '<span class="woocommerce-Price-amount amount">' + 
+												'<span class="woocommerce-Price-currencySymbol">$</span>' + 
+												product.regular_price + 
+												'</span>';
+								} else if ( product.price ) {
+									priceHtml = '<span class="woocommerce-Price-amount amount">' + 
+												'<span class="woocommerce-Price-currencySymbol">$</span>' + 
+												product.price + 
+												'</span>';
+								}
+								
+								productElement.classList.remove('vm-product-loading');
+								productElement.innerHTML = 
+									'<h3>' + product.name + '</h3>' +
+									'<span class="price">' + priceHtml + '</span>';
+							} else {
+								productElement.classList.remove('vm-product-loading');
+								productElement.innerHTML = 
+									'<h3>Product ID: ' + productId + '</h3>' +
+									'<span class="price">Product not found</span>';
+							}
+						})
+						.catch(function(error) {
+							if ( productElement ) {
+								productElement.classList.remove('vm-product-loading');
+								productElement.innerHTML = 
+									'<h3>Product ID: ' + productId + '</h3>' +
+									'<span class="price">Error: ' + (error.message || 'Failed to load') + '</span>';
+							}
+						});
+					}
+				};
+				setTimeout(fetchProducts, 500);
+			}
 		} else {
 			#>
 			<div class="vm-widget-placeholder vm-product-selector">

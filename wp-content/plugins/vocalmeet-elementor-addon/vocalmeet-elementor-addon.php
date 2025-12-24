@@ -69,7 +69,7 @@ final class Vocalmeet_Elementor_Addon {
 		wp_enqueue_script(
 			'vm-elementor-editor',
 			plugins_url( 'assets/js/elementor-editor.js', __FILE__ ),
-			[ 'elementor-editor' ],
+			[ 'jquery', 'elementor-editor' ],
 			'1.0.0',
 			true
 		);
