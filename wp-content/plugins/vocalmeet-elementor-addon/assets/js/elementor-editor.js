@@ -15,11 +15,13 @@
                     <form id="vm-product-form">
                         <div style="margin-bottom:15px;">
                             <label for="vm-modal-name" style="display:block;margin-bottom:5px;font-weight:bold;">Product Name</label>
-                            <input type="text" id="vm-modal-name" name="name" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+                            <input type="text" id="vm-modal-name" name="name" required maxlength="200" minlength="2" pattern=".{2,200}" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+                            <small style="color:#666;font-size:11px;">2-200 characters</small>
                         </div>
                         <div style="margin-bottom:20px;">
                             <label for="vm-modal-price" style="display:block;margin-bottom:5px;font-weight:bold;">Price</label>
-                            <input type="number" id="vm-modal-price" name="regular_price" step="0.01" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+                            <input type="number" id="vm-modal-price" name="regular_price" step="0.01" min="0" max="999999.99" required style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;">
+                            <small style="color:#666;font-size:11px;">$0.00 - $999,999.99</small>
                         </div>
                         <div style="text-align:right;">
                             <button type="button" id="vm-modal-cancel" style="margin-right:10px;padding:8px 16px;cursor:pointer;background:#f0f0f0;border:1px solid #ccc;border-radius:4px;">Cancel</button>
@@ -37,19 +39,206 @@
         const cancelBtn = document.getElementById('vm-modal-cancel');
         const form = document.getElementById('vm-product-form');
         const messageDiv = document.getElementById('vm-modal-message');
+        const nameInput = document.getElementById('vm-modal-name');
+        const priceInput = document.getElementById('vm-modal-price');
+
+        // Rate limiting: track last submission time
+        let lastSubmissionTime = 0;
+        const MIN_SUBMISSION_INTERVAL = 2000; // 2 seconds between submissions
+
+        // Security: HTML escape function to prevent XSS
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Security: Sanitize input - remove dangerous characters and trim
+        function sanitizeInput(input) {
+            if (typeof input !== 'string') {
+                return '';
+            }
+            // Remove null bytes, control characters, and trim whitespace
+            return input
+                .replace(/\0/g, '')
+                .replace(/[\x00-\x1F\x7F]/g, '')
+                .trim();
+        }
+
+        // Validation: Validate product name
+        function validateProductName(name) {
+            const sanitized = sanitizeInput(name);
+            
+            // Check if empty
+            if (!sanitized || sanitized.length === 0) {
+                return {
+                    valid: false,
+                    message: 'Product name is required.'
+                };
+            }
+
+            // Check length (min 2, max 200 characters)
+            if (sanitized.length < 2) {
+                return {
+                    valid: false,
+                    message: 'Product name must be at least 2 characters long.'
+                };
+            }
+
+            if (sanitized.length > 200) {
+                return {
+                    valid: false,
+                    message: 'Product name must not exceed 200 characters.'
+                };
+            }
+
+            // Check for potentially dangerous patterns (basic XSS prevention)
+            const dangerousPatterns = [
+                /<script/i,
+                /javascript:/i,
+                /on\w+\s*=/i, // onclick, onerror, etc.
+                /<iframe/i,
+                /<object/i,
+                /<embed/i
+            ];
+
+            for (let pattern of dangerousPatterns) {
+                if (pattern.test(sanitized)) {
+                    return {
+                        valid: false,
+                        message: 'Product name contains invalid characters.'
+                    };
+                }
+            }
+
+            return {
+                valid: true,
+                value: sanitized
+            };
+        }
+
+        // Validation: Validate price
+        function validatePrice(price) {
+            const sanitized = sanitizeInput(price);
+            
+            // Check if empty
+            if (!sanitized || sanitized.length === 0) {
+                return {
+                    valid: false,
+                    message: 'Price is required.'
+                };
+            }
+
+            // Convert to number
+            const priceNum = parseFloat(sanitized);
+
+            // Check if valid number
+            if (isNaN(priceNum)) {
+                return {
+                    valid: false,
+                    message: 'Price must be a valid number.'
+                };
+            }
+
+            // Check if positive
+            if (priceNum < 0) {
+                return {
+                    valid: false,
+                    message: 'Price must be a positive number.'
+                };
+            }
+
+            // Check if too large (prevent overflow attacks)
+            if (priceNum > 999999.99) {
+                return {
+                    valid: false,
+                    message: 'Price must not exceed $999,999.99.'
+                };
+            }
+
+            // Check decimal places (max 2)
+            const decimalPlaces = (sanitized.split('.')[1] || '').length;
+            if (decimalPlaces > 2) {
+                return {
+                    valid: false,
+                    message: 'Price can have at most 2 decimal places.'
+                };
+            }
+
+            return {
+                valid: true,
+                value: priceNum.toFixed(2)
+            };
+        }
+
+        // Function to show error message (with XSS protection)
+        function showError(message) {
+            messageDiv.style.display = 'block';
+            messageDiv.innerHTML = '<p style="color:red;margin:0;">' + escapeHtml(message) + '</p>';
+        }
+
+        // Function to show success message (with XSS protection)
+        function showSuccess(message) {
+            messageDiv.style.display = 'block';
+            messageDiv.innerHTML = '<p style="color:green;margin:0;">' + escapeHtml(message) + '</p>';
+        }
+
+        // Function to clear message
+        function clearMessage() {
+            messageDiv.style.display = 'none';
+            messageDiv.innerHTML = '';
+        }
+
+        // Add real-time validation feedback
+        if (nameInput) {
+            nameInput.addEventListener('input', function() {
+                const validation = validateProductName(this.value);
+                if (this.value.length > 0 && !validation.valid) {
+                    this.style.borderColor = '#dc3545';
+                } else {
+                    this.style.borderColor = '#ddd';
+                }
+            });
+        }
+        
+        if (priceInput) {
+            priceInput.addEventListener('input', function() {
+                const validation = validatePrice(this.value);
+                if (this.value.length > 0 && !validation.valid) {
+                    this.style.borderColor = '#dc3545';
+                } else {
+                    this.style.borderColor = '#ddd';
+                }
+            });
+        }
 
         // Function to open modal
         function openModal() {
             modal.style.display = 'flex';
-            document.getElementById('vm-modal-name').focus();
+            
             // Reset form
             form.reset();
-            messageDiv.style.display = 'none';
-            messageDiv.innerHTML = '';
+            clearMessage();
+            
             // Reset submit button state
             const createBtn = document.getElementById('vm-modal-create');
             createBtn.disabled = false;
             createBtn.textContent = 'Create Product';
+            
+            // Reset rate limiting
+            lastSubmissionTime = 0;
+            
+            // Reset input border colors
+            if (nameInput) nameInput.style.borderColor = '#ddd';
+            if (priceInput) priceInput.style.borderColor = '#ddd';
+            
+            // Focus on name input
+            if (nameInput) nameInput.focus();
         }
 
         // Function to close modal
@@ -80,10 +269,15 @@
             
             let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
             recentProducts.forEach(product => {
+                // Sanitize product data to prevent XSS
+                const productId = parseInt(product.id) || 0;
+                const productName = escapeHtml(String(product.name || ''));
+                const productPrice = escapeHtml(String(product.price || '0.00'));
+                
                 html += `
-                    <div class="vm-product-item" data-product-id="${product.id}" style="padding:10px;border:1px solid #ddd;border-radius:4px;cursor:pointer;transition:background 0.2s;background:#fff;">
-                        <div style="font-weight:bold;font-size:13px;margin-bottom:4px;">${product.name}</div>
-                        <div style="font-size:11px;color:#666;">ID: ${product.id} | Price: $${product.price || '0.00'}</div>
+                    <div class="vm-product-item" data-product-id="${productId}" style="padding:10px;border:1px solid #ddd;border-radius:4px;cursor:pointer;transition:background 0.2s;background:#fff;">
+                        <div style="font-weight:bold;font-size:13px;margin-bottom:4px;">${productName}</div>
+                        <div style="font-size:11px;color:#666;">ID: ${productId} | Price: $${productPrice}</div>
                     </div>
                 `;
             });
@@ -153,20 +347,44 @@
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const name = document.getElementById('vm-modal-name').value.trim();
-            const price = document.getElementById('vm-modal-price').value.trim();
+            const nameInput = document.getElementById('vm-modal-name');
+            const priceInput = document.getElementById('vm-modal-price');
             const createBtn = document.getElementById('vm-modal-create');
 
-            if (!name || !price) {
-                messageDiv.style.display = 'block';
-                messageDiv.innerHTML = '<p style="color:red;margin:0;">Please fill in all fields.</p>';
+            // Rate limiting: prevent rapid submissions
+            const currentTime = Date.now();
+            if (lastSubmissionTime > 0 && (currentTime - lastSubmissionTime) < MIN_SUBMISSION_INTERVAL) {
+                showError('Please wait a moment before submitting again.');
                 return;
             }
 
+            // Validate product name
+            const nameValidation = validateProductName(nameInput.value);
+            if (!nameValidation.valid) {
+                showError(nameValidation.message);
+                nameInput.focus();
+                return;
+            }
+
+            // Validate price
+            const priceValidation = validatePrice(priceInput.value);
+            if (!priceValidation.valid) {
+                showError(priceValidation.message);
+                priceInput.focus();
+                return;
+            }
+
+            // All validations passed, proceed with submission
+            const sanitizedName = nameValidation.value;
+            const sanitizedPrice = priceValidation.value;
+
+            // Disable button and show loading state
             createBtn.disabled = true;
             createBtn.textContent = 'Creating...';
-            messageDiv.style.display = 'none';
-            messageDiv.innerHTML = '';
+            clearMessage();
+
+            // Update last submission time
+            lastSubmissionTime = currentTime;
 
             // Create product via REST API
             fetch(vmEditorData.root + 'wc/v3/products', {
@@ -176,32 +394,48 @@
                     'X-WP-Nonce': vmEditorData.nonce
                 },
                 body: JSON.stringify({
-                    name: name,
-                    regular_price: price,
+                    name: sanitizedName,
+                    regular_price: sanitizedPrice,
                     type: 'simple',
                     status: 'publish'
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.id) {
-                    // Product created successfully
-                    // Reset submit button before closing modal
-                    createBtn.disabled = false;
-                    createBtn.textContent = 'Create Product';
-                    closeModal();
-                    
-                    // Store product in localStorage for later use
-                    let recentProducts = JSON.parse(localStorage.getItem('vm_recent_products') || '[]');
-                    recentProducts.unshift({
-                        id: data.id,
-                        name: data.name,
-                        price: data.regular_price || data.price,
-                        created_at: new Date().toISOString()
+            .then(response => {
+                // Check if response is ok (status 200-299)
+                if (!response.ok) {
+                    // Try to parse error response
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.message || `Server error: ${response.status} ${response.statusText}`);
+                    }).catch(() => {
+                        // If JSON parsing fails, throw generic error
+                        throw new Error(`Server error: ${response.status} ${response.statusText}`);
                     });
-                    // Keep only last 20 products
-                    recentProducts = recentProducts.slice(0, 20);
-                    localStorage.setItem('vm_recent_products', JSON.stringify(recentProducts));
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Additional validation: ensure we have a valid product ID
+                if (!data || !data.id) {
+                    throw new Error(data.message || 'Invalid response from server. Product may not have been created.');
+                }
+                
+                // Product created successfully
+                // Reset submit button before closing modal
+                createBtn.disabled = false;
+                createBtn.textContent = 'Create Product';
+                closeModal();
+                
+                // Sanitize and store product in localStorage for later use
+                let recentProducts = JSON.parse(localStorage.getItem('vm_recent_products') || '[]');
+                recentProducts.unshift({
+                    id: parseInt(data.id) || 0, // Ensure ID is a number
+                    name: sanitizeInput(String(data.name || '')), // Sanitize name
+                    price: sanitizeInput(String(data.regular_price || data.price || '0.00')), // Sanitize price
+                    created_at: new Date().toISOString()
+                });
+                // Keep only last 20 products
+                recentProducts = recentProducts.slice(0, 20);
+                localStorage.setItem('vm_recent_products', JSON.stringify(recentProducts));
                     
                     // Refresh product lists in all widgets
                     renderAllProductLists();
@@ -287,15 +521,15 @@
                     } else {
                         alert('Product created successfully! Product ID: ' + data.id);
                     }
-                } else {
-                    throw new Error(data.message || 'Failed to create product');
-                }
             })
             .catch(error => {
                 createBtn.disabled = false;
                 createBtn.textContent = 'Create Product';
-                messageDiv.style.display = 'block';
-                messageDiv.innerHTML = '<p style="color:red;margin:0;">Error: ' + (error.message || 'Failed to create product') + '</p>';
+                // Sanitize error message to prevent XSS
+                const errorMessage = error.message || 'Failed to create product. Please try again.';
+                showError('Error: ' + errorMessage);
+                // Reset rate limiting on error so user can retry
+                lastSubmissionTime = 0;
             });
         });
         
